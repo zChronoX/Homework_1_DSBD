@@ -1,6 +1,6 @@
 ## **Homework 1 per il corso di Sistemi Distribuiti e Big Data (A.A. 2025-2026)**
 
-Questo repository contiene l'implementazione di un sistema distribuito a microservizi dockerizzato per la gestione di utenti e il monitoraggio di voli aerei, sfruttando le API di **OpenSky Network**.
+Questo repository contiene l'implementazione di un sistema distribuito a microservizi dockerizzato per la gestione di utenti e il monitoraggio di voli aerei, sfruttando le API di **OpenSky**.
 
 ## Architettura del Sistema
 
