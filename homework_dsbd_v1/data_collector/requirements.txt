@@ -1,0 +1,7 @@
+flask
+grpcio
+grpcio-tools
+pymongo
+protobuf
+requests
+apscheduler

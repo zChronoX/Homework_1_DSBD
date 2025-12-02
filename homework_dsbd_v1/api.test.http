@@ -1,0 +1,136 @@
+# File che mi permette di simulare le richieste HTTP senza l'intervento di Postman
+# Test dello user manager
+
+### 1. Registrazione Utente
+# Usiamo un ID statico 'req-123' per poter testare la cache dopo
+# Questo dovrebbe funzionare tranquillamente
+POST http://127.0.0.1:5000/users
+Content-Type: application/json
+RequestID: req-123
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "PasswordSicura!",
+  "nome": "Mario",
+  "cognome": "Rossi",
+  "codice_fiscale": "RSSMRA80A01H501U",
+  "carta_credito": "1234567812345678",
+  "scadenza": "12/30",
+  "cvv": "123"
+}
+
+### 2. Test funzionamento At-Most-Once
+# Inviamo la stessa richiesta (stesso RequestID). Il server non mi deve dare l'errore 409 ma deve rispondere con 200 (indicando che c'è stato un'hit nella memoria cache)
+POST http://127.0.0.1:5000/users
+Content-Type: application/json
+RequestID: req-123
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "PasswordSicura!",
+  "nome": "Mario",
+  "cognome": "Rossi",
+  "codice_fiscale": "RSSMRA80A01H501U",
+  "carta_credito": "1234567812345678",
+  "scadenza": "12/30",
+  "cvv": "123"
+}
+
+### 3. Test funzionamento At-Most-Once 2
+# Se provo a usare l'ID 'req-123' per un'altra persona, deve dare errore.
+POST http://127.0.0.1:5000/users
+Content-Type: application/json
+RequestID: req-123
+
+{
+  "email": "luigi.verdi@unict.it",
+  "password": "Password2!",
+  "nome": "Luigi",
+  "cognome": "Verdi",
+  "codice_fiscale": "VRDLGU80A01H501X",
+  "carta_credito": "8765432187654321",
+  "scadenza": "10/28",
+  "cvv": "456"
+}
+
+### 4. Registrazione di un nuovo utente random
+POST http://127.0.0.1:5000/users
+Content-Type: application/json
+RequestID: random-123
+
+{
+  "email": "user_random@test.it",
+  "password": "Password123",
+  "nome": "Utente Random",
+  "cognome": "Casuale",
+  "codice_fiscale": "CSLNDM99R01H501Z",
+  "carta_credito": "1111222233334444",
+  "scadenza": "01/29",
+  "cvv": "999"
+}
+
+### 5. Cancellazione Utente (Password Errata)
+# Deve dare errore 401 perché la password che ho inserito nella request è sbagliata
+DELETE http://127.0.0.1:5000/users
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "password_sbagliata"
+}
+
+### 6. Elimina Utente Mario (Password Corretta)
+DELETE http://127.0.0.1:5000/users
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "PasswordSicura!"
+}
+
+
+### Test del data collector
+### 7. Aggiungi Interesse (Utente Inesistente)
+# Deve dare 404 perché 'fantasma' non è nel DB Utenti.
+POST http://127.0.0.1:5001/interests
+Content-Type: application/json
+
+{
+  "email": "fantasma@nulla.com",
+  "airport_code": "LICC"
+}
+
+### 8. Aggiungi Interesse
+# Usiamo l'email dell'utente creato nella prima request
+POST http://127.0.0.1:5001/interests
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "airport_code": "EGLL"
+}
+
+### 9. Recupera Voli (Londra)
+#Mi torna un file json con tutti i voli in formato grezzo dell'aeroporto di Londra
+GET http://127.0.0.1:5001/flights/EGLL
+Accept: application/json
+
+### 10. Recupera Voli (Catania)
+#Non torna niente (lista vuota) perché non ho messo Catania negli interessi
+GET http://127.0.0.1:5001/flights/LICC
+Accept: application/json
+
+### 11. Recupera l'ULTIMO volo in ARRIVO a Londra
+# Restituisce un solo oggetto JSON (il piu' recente).
+GET http://127.0.0.1:5001/flights/last?code=EGLL&type=arrival
+Accept: application/json
+
+### 12. Recupera l'ULTIMO volo in PARTENZA da Londra
+# Uguale a sopra ma nella richiesta abbiamo specificato che è una partenza
+GET http://127.0.0.1:5001/flights/last?code=EGLL&type=departure
+Accept: application/json
+
+### 13. Calcola MEDIA giornaliera dei voli in arrivo all'aeroporto di Londra
+# Restituisce il JSON con la statistica calcolata.
+GET http://127.0.0.1:5001/statistics/average?code=EGLL&days=3&type=arrival
+Accept: application/json
