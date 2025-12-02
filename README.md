@@ -35,6 +35,12 @@ Per eseguire il progetto in locale è necessario disporre di:
 
 ## Configurazione Iniziale
 
+### Step Preliminare: Clonare la repository dal seguente link
+
+```
+https://github.com/zChronoX/Homework_1_DSBD.git
+```
+
 ### 1. Configurazione Credenziali (Obbligatorio)
 Il sistema necessita di credenziali valide per autenticarsi presso OpenSky tramite protocollo OAuth2.
 
