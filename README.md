@@ -19,8 +19,8 @@ Il sistema è containerizzato tramite Docker e orchestrato via Docker Compose. S
     * **Database:** MongoDB (NoSQL).
 
 3.  **Database Services**
-    * **PostgreSQL:** Per dati strutturati e integrità referenziale (Utenti).
-    * **MongoDB:** Per l'ingestione flessibile di dati JSON complessi (Voli).
+    * **PostgreSQL:** Per dati sensibili degli Utenti.
+    * **MongoDB:** Per gestire in modo semplice e funzionale i dati dei voli.
 
 4.  **Shared Library**
     * Modulo condiviso per configurazioni, gestione errori centralizzata e connettori DB.
@@ -58,7 +58,7 @@ Il sistema necessita di credenziali valide per autenticarsi presso OpenSky trami
 
 ### 2. Build
 
-E' consigliato esseguire una pulizia d'ambiente prima di effettuare il build delle immagini dei servizi tramite i seguenti comandi:
+E' consigliato eseguire una pulizia d'ambiente prima di effettuare il build delle immagini dei servizi tramite i seguenti comandi:
 
 ```
 
