@@ -44,10 +44,9 @@ https://github.com/zChronoX/Homework_1_DSBD.git
 ### 1. Configurazione Credenziali (Obbligatorio)
 Il sistema necessita di credenziali valide per autenticarsi presso OpenSky tramite protocollo OAuth2.
 
-1.  Registrati sul sito di OpenSky Network e ottieni un `Client ID` e un `Client Secret`.
-2.  Crea un file denominato `credentials.json`.
-3.  Posiziona il file all'interno della cartella: `data_collector/`.
-4.  Il contenuto deve rispettare rigorosamente questo formato JSON:
+1.  Registrati sul sito di OpenSky e scarica il file `credentials.json` il quale contiene un `Client ID` e un `Client Secret`.
+2.  Posiziona il file all'interno della cartella: `data_collector/`.
+3.  Il contenuto del file deve rispettare rigorosamente questo formato JSON:
 
 ```json
 {
