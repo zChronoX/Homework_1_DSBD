@@ -1,0 +1,6 @@
+flask
+grpcio
+grpcio-tools
+protobuf
+psycopg2-binary #Meglio di sqlAlchemy
+requests

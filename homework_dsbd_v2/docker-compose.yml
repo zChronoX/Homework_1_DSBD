@@ -1,0 +1,185 @@
+services:
+  # 1.DB UTENTI (PostgreSQL)
+  postgres_container:
+    image: postgres:15-alpine
+    container_name: postgres_container
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: user_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend_network
+
+  # 2.DB DATI (MongoDB)
+  mongo_container:
+    image: mongo:latest
+    container_name: mongo_container
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: adminpassword
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - backend_network
+
+  #3.USER MANAGER
+  user_manager:
+    build:
+      context: .
+      dockerfile: user_manager/Dockerfile
+    container_name: user_manager
+    depends_on:
+      - postgres_container
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app:/app/shared
+    networks:
+      - backend_network
+
+  # 4.DATA COLLECTOR
+  data_collector:
+    build:
+      context: .
+      dockerfile: data_collector/Dockerfile
+    container_name: data_collector
+    depends_on:
+      user_manager:
+        condition: service_started
+      mongo_container:
+        condition: service_started
+      #Questo mi serve per gestire il fatto che il Data_Collector deve attendere che il Kafka sia pronto
+      kafka_broker:
+        condition: service_healthy
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app:/app/shared
+    networks:
+      - backend_network
+
+
+  # 5. MESSAGE BROKER (Kafka in modalità KRaft)
+  kafka_broker:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka_broker
+    ports:
+      - "29092:29092" # Porta per l'host (il tuo PC)
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka_broker:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+      # Configurazione Listener
+      # - PLAINTEXT:9092 -> Per comunicazione interna tra container (es. Data Collector -> Kafka)
+      # - PLAINTEXT_HOST:29092 -> Per comunicazione esterna
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_broker:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # Cartelle dati
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      # Replication Factor (essendo nodo singolo mettiamo 1 per evitare errori)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    #Questo blocco mi serve per bloccare il Data_Collector fino a quando Kafka non è pronto
+    #Essendo che il Data_Collector è "leggero" si avvia subito, mentre Kafka ci mette tempo ad avviarsi
+    #Pertanto, una volta che il Data_Collector parte e prova a connettersi alla porta 9092, Kafka
+    #sta ancora caricando, e quindi va in crash
+    healthcheck:
+      test: nc -z localhost 9092 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend_network
+
+  # 6. ALERT SYSTEM
+  alert_system:
+    build:
+      context: .
+      dockerfile: alert_system/Dockerfile
+    container_name: alert_system
+    depends_on:
+      kafka_broker:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app:/app/shared
+    networks:
+      - backend_network
+
+  # 7. NOTIFIER SYSTEM
+  notifier:
+    build:
+      context: .
+      dockerfile: notifier/Dockerfile
+    container_name: notifier
+    depends_on:
+      kafka_broker:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app:/app/shared
+      - SENDER_EMAIL=giovannicontarino@gmail.com
+      - SENDER_PASSWORD=esrtxsgsfkyrraxs
+    networks:
+      - backend_network
+
+  # 8. API GATEWAY (NGINX)
+  nginx_gateway:
+    image: nginx:latest
+    container_name: nginx_gateway
+    restart: always
+    ports:
+      - "80:80"  # Unico punto di ingresso esposto
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - user_manager
+      - data_collector
+    networks:
+      - frontend_network
+      - backend_network
+
+
+# Usiamo due reti separate per sicurezza e organizzazione logica:
+# 1. backend_network:
+# È una rete privata e isolata. Qui risiedono i microservizi (User Manager, Data Collector),
+# i database (Mongo, Postgres) e Kafka. Possono comunicare tra loro velocemente,
+# ma non sono raggiungibili direttamente dall'esterno.
+
+
+# 2. frontend_network:
+#È la rete di ingresso. Attualmente ospita l'API Gateway (Nginx).
+
+
+# IL RUOLO DI NGINX:
+#Nginx è l'unico container collegato a ENTRAMBE le reti.
+#Riceve le richieste dall'esterno (porta 80) e le inoltra
+#ai servizi protetti all'interno della backend_network.
+
+networks:
+  frontend_network:
+    driver: bridge
+  backend_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongo_data:
+  kafka_data:
