@@ -9,7 +9,7 @@ Il sistema è containerizzato tramite Docker e orchestrato via Docker Compose. L
 ### Core Services
 1.  **API Gateway (Nginx)**
     * Unico punto di ingresso del sistema (Porta 80).
-    * Gestisce il routing verso i microservizi (`/users`, `/flights`, `/interests`) nascondendo la topologia interna.
+    * Gestisce il routing verso i microservizi (`/users`, `/flights`, `/interests`, `/statistics`) nascondendo la topologia interna.
 2.  **User Manager Service**
     * Gestisce identità e sicurezza (Hashing SHA-256).
     * Implementa la politica **At-Most-Once**.
