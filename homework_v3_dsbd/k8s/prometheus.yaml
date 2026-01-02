@@ -1,0 +1,100 @@
+#In questo file configuriamo il server Prometheus, che è il cuore del nostro
+#sistema di monitoraggio.
+#In questo caso per semplicità abbiamo deciso di unire ConfigMaps, StatefulSet e Service tutti in un file.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-server-conf
+data:
+  prometheus.yml: |
+    global:
+      #Abbiamo deciso di impostare un intervallo di 10 secondi per ogni scrape
+      #cioè Prometheus si collega ogni 10s ai nostri microservizi per leggere le metriche
+      #esposte nella porta 8000.
+      scrape_interval: 10s
+    #Questa è la lista dei servizi da monitorare, oltre allo user manager e data collector,
+    #abbiamo deciso di includere anche il notifier.
+    scrape_configs:
+      - job_name: 'user-manager'
+        static_configs:
+          - targets: ['user-manager:8000']
+      - job_name: 'data-collector'
+        static_configs:
+          - targets: ['data-collector:8000']
+      - job_name: 'notifier'
+        static_configs:
+          - targets: ['notifier:8000']
+      #Abbiamo inoltre deciso di includere il server Prometheus, per poter monitorare
+      #se stesso (memoria, CPU usata, ecc).
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+---
+#Abbiamo deciso di usare un StatefulSet per il server Prometheus.
+#Questo ci permette di avere uno storage persistente (PVC) invece di uno volatile.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus-server
+spec:
+  #serviceName è obbligatorio per gli StatefulSet per mantenere l'identità di rete stabile.
+  serviceName: "prometheus-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-server
+  template:
+    metadata:
+      labels:
+        app: prometheus-server
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.44.0 #Immagine ufficiale di Prometheus
+          args:
+            #Gli diciamo dove trovare il config file (che monteremo col volume)
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            #Dove salvare i dati delle serie temporali
+            - "--storage.tsdb.path=/prometheus/"
+            #Opzionale: diciamo a Prometheus di conservare i dati per 30 giorni
+            - "--storage.tsdb.retention.time=30d"
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            #Montiamo la ConfigMap come file fisico
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus/
+            #Montiamo lo storage per i dati (ora persistente)
+            - name: prometheus-storage
+              mountPath: /prometheus/
+      volumes:
+        #Trasforma la ConfigMap definita sopra in un file sul filesystem
+        - name: prometheus-config-volume
+          configMap:
+            defaultMode: 420
+            name: prometheus-server-conf
+
+
+  #Persistenza dei dati
+  #Genera automaticamente una PVC (Persistent Volume Claim) dedicata per Prometheus.
+  #Questo garantisce che lo storico delle metriche non vada perso al riavvio del pod.
+  volumeClaimTemplates:
+    - metadata:
+        name: prometheus-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+spec:
+  selector:
+    app: prometheus-server
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090

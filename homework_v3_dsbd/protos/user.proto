@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package userservice;
+
+
+//Servizio che mi risponde alle domande
+service UserManager{
+
+//Metodo che mi risponde se un utente esiste
+rpc CheckUserExists(UserRequest) returns (UserResponse);
+
+
+// [NUOVO] Metodo che verifica se le credenziali (email + password) sono valide
+rpc VerifyUserCredentials(CredentialsRequest) returns (UserResponse);
+
+}
+
+//Richiesta del servizio
+message UserRequest{
+string email = 1;
+}
+
+// [NUOVO] Richiesta con credenziali complete
+message CredentialsRequest{
+  string email = 1;
+  string password = 2;
+}
+
+//Risposta del servizio
+message UserResponse{
+bool exists = 1;
+}

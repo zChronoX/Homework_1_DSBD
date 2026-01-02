@@ -1,0 +1,131 @@
+#File di configurazione per i database, in cui definiamo l'infrastruttura di
+#persistenza dei due database usati: Postgres e Mongo.
+
+#Il cuore di questo file è la definizione del StatefulSet sia per Postgres che per Mongo.
+#Scelta pressoché obbligatoria per applicazioni come database. In cui il "Deployment"
+#non è sufficiente per garantire la persistenza dei dati, in quanto "senza memoria".
+#Cioè nel caso in cui il pod sia riavviato, tutti i dati vengono persi.
+
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: "postgres-service" #Collega il Pod al Service per la risoluzione DNS interna
+  replicas: 1 # Numero di copie del pod, in questo caso abbiamo una sola istanza
+  selector:
+    matchLabels:
+      app: postgres #Label per identificare i pod gestiti da questo set
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:13 #Versione stabile di Postgres
+          ports:
+            - containerPort: 5432 #Porta standard Postgres
+          env:
+          #Qui mappiamo le variabili d'ambiente richieste dall'immagine Docker
+          #ai nostri file di configurazione esterni (ConfigMap e Secrets).
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: homework3-dsbd-config # Nome del file ConfigMap
+                  key: PG_NAME #Chiave dentro quel file
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: homework3-dsbd-config
+                  key: PG_USER
+            #Qui non scriviamo la password in chiaro, ma la leggiamo dai Secrets.
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: homework3-dsbd-secrets #Nome del Secret
+                  key: PG_PASS #Chiave dentro il Secret
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data #Path standard di Postgres
+  #Qui indico al container quale sia il disco virtuale da collegare alla cartella in cui
+  #salvare i dati
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes: ["ReadWriteOnce"] #Il volume può essere montato da un solo nodo alla volta
+        resources:
+          requests:
+            storage: 1Gi #Riserviamo 1 Giga di spazio su disco
+---
+#Servizio per esporre Postgres agli altri pod (User Manager)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+---
+#Configurazione per Mongo, la logica è la stessa di quella sopra per Postgres
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: "mongo-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:5.0
+          ports:
+            - containerPort: 27017 # Porta standard MongoDB
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: "admin"
+            #La password di root viene letta in modo sicuro dai Secrets
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: homework3-dsbd-secrets
+                  key: mongo-root-password
+          #Montiamo il volume nel percorso dove Mongo salva i dati
+          volumeMounts:
+            - name: mongo-storage
+              mountPath: /data/db
+  #Richiesta di storage persistente (analogo a sopra)
+  #così Kubernetes gestisce automaticamente i dischi, creandone uno nuovo ogni volta che scala il db.
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+spec:
+  selector:
+    app: mongo
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017

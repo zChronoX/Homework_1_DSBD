@@ -1,0 +1,99 @@
+#Questo deployment configura un singolo nodo Kafka che funge sia da Broker
+#che da Controller (modalità "Combined").
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          # Immagine ufficiale Confluent che utilizza Kafka in modalità KRaft
+          image: confluentinc/cp-kafka:7.4.0
+          ports:
+            - containerPort: 9092 # Porta standard per il traffico client
+          #Questo script serve per inizializzare KRaft.
+          #Abbiamo usato 3 comandi shell per eseguire queste operazioni:
+          #il primo serve ad assegnare a Kafka un ID univoco, cosa che veniva fatta automaticamente
+          #da Zookeeper. Nel nostro caso non abbiamo assegnato un vero ID random, ma un ID fisso
+          #per semplicità.
+          #Il secondo serve per formattare lo storage, in modo che Kafka possa salvare
+          #i suoi metadati interni, come quali topic esistono, ecc. Senza questo
+          #Kafka fallirebbe all'avvio non sapendo dove salvare lo stato del cluster.
+          #Aggiungiamo anche un flag che permette di ignorare la formattazione, nel caso in cui
+          #il disco sia già formattato.
+          #L'ultimo comando avvia Kafka normalmente.
+          command:
+            - "sh"
+            - "-c"
+            - |
+              # Generiamo un ID se non esiste (o usiamo quello fisso)
+              export CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+              
+              echo "Formattazione Storage KRaft con ID: $CLUSTER_ID"
+              # Formattiamo il path dei dati ignorando errori se è già formattato
+              kafka-storage format -t $CLUSTER_ID -c /etc/kafka/kafka.properties --ignore-formatted
+              
+              # Avviamo Kafka normalmente
+              /etc/confluent/docker/run
+          #Configurazione ambiente di Kafka
+          env:
+            #ID numerico univoco di questo nodo all'interno del cluster Kafka
+            - name: KAFKA_NODE_ID
+              value: "1"
+            #Mappa dei protocolli di sicurezza per le varie interfacce
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+            #Questo è l'indirizzo che Kafka comunica ai client (Data Collector, ecc).
+            #Deve corrispondere al nome del Service Kubernetes
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka-service:9092"
+            #Interfacce su cui il processo ascolta fisicamente
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+            #Configurazione specifica KRaft: quale listener usare per la comunicazione interna
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+              #Ruoli del nodo: in KRaft un nodo può essere Broker (gestisce dati)
+              #e/o Controller (gestisce metadati), noi facciamo entrambi.
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            #Chi sono i votanti per il quorum? Se stesso (siamo single-node)
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@localhost:9093"
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+
+            #Poiché abbiamo 1 solo nodo, dobbiamo forzare i fattori di replica a 1.
+            #Se lasciassimo il default, Kafka darebbe errori perché
+            #non trova altri nodi su cui copiare i dati.
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            #Evita ritardi all'avvio nel ribilanciamento dei gruppi consumer
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service #Nome host usato in Python (KAFKA_BOOTSTRAP_SERVERS)
+spec:
+  selector:
+    app: kafka
+  ports:
+    - protocol: TCP
+      port: 9092
+      targetPort: 9092

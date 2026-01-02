@@ -1,0 +1,77 @@
+#Questo file permette di definire regole di sicurezza per i database.
+#Qui facciamo in modo che i database accettino connessioni esclusivamente dai
+#microservizi che li utilizzano in modo legittimo.
+#Quindi non abbiamo più un flat network come nel caso di Docker senza networks o
+#in K8s di default, in cui tutti i Pod possono comunicare tra loro.
+
+
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-protection-policy
+spec:
+  #Selezioniamo entrambi i database (Postgres e Mongo) usando un'espressione.
+  #Quando un Pod viene selezionato da una NetworkPolicy, viene automaticamente
+  #ISOLATO: rifiuta tutto il traffico che non è esplicitamente permesso.
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [postgres, mongo]}
+  #Dichiariamo che stiamo controllando il traffico in ingresso
+  #ma non specifichiamo nessuna regola, cioè non diciamo chi può accedere
+  #cioè blocchiamo a prescindere tutto.
+  #le singole regole saranno definite successivamente.
+  policyTypes:
+    - Ingress
+
+---
+#Regole per Postgres
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: protect-postgres
+spec:
+  #Applichiamo questa regola specifica al Pod Postgres
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  #Qui abbiamo una specie di whitelist, cioè definiamo solo chi può entrare
+  #nel caso specifico di postgres, l'unico pod che deve accedere al db utenti
+  #è proprio quello dello user manager nella porta specifica.
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: user-manager
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+#Regole per Mongo
+#Abbiamo seguito esattamente lo stesso iter anche per mongo, quindi applichiamo la regola
+#al pod di mongo, e nella whitelist specificiamo solo quello del data collector nella porta corretta.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: protect-mongo
+spec:
+  podSelector:
+    matchLabels:
+      app: mongo
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: data-collector
+          #L'Alert System deve LEGGERE gli interessi
+        - podSelector:
+            matchLabels:
+              app: alert-system
+      ports:
+        - protocol: TCP
+          port: 27017

@@ -1,0 +1,15 @@
+COMANDI UTILI PER KUBERNETES
+
+docker stop kind-control-plane
+
+docker start kind-control-plane
+
+kubectl get pods
+
+kind load docker-image X
+
+docker build -t user-manager:v3.0 -f ./user_manager/Dockerfile .
+
+kubectl apply -f k8s
+
+kubectl logs -f deployment/data-collector

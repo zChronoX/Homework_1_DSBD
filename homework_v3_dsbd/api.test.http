@@ -1,0 +1,292 @@
+# File che mi permette di simulare le richieste HTTP senza l'intervento di Postman
+
+#Scenario 1: Gestione utenti (registrazione/cancellazione) (User Manager)
+
+### 1.1 Registrazione Utente
+# Usiamo un ID statico 'req-123' per poter testare la cache dopo
+# Questo dovrebbe funzionare tranquillamente
+POST http://127.0.0.1/users
+Content-Type: application/json
+RequestID: req-123
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "PasswordSicura!",
+  "nome": "Mario",
+  "cognome": "Rossi",
+  "codice_fiscale": "RSSMRA80A01H501U",
+  "carta_credito": "1234567812345678",
+  "scadenza": "12/30",
+  "cvv": "123"
+}
+
+### 1.2 Test funzionamento At-Most-Once
+# Inviamo la stessa richiesta (stesso RequestID). Il server non mi deve dare l'errore 409 ma deve rispondere con 200 (indicando che c'è stato un'hit nella memoria cache)
+POST http://127.0.0.1/users
+Content-Type: application/json
+RequestID: req-123
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "PasswordSicura!",
+  "nome": "Mario",
+  "cognome": "Rossi",
+  "codice_fiscale": "RSSMRA80A01H501U",
+  "carta_credito": "1234567812345678",
+  "scadenza": "12/30",
+  "cvv": "123"
+}
+
+### 1.3 Test funzionamento At-Most-Once 2
+# Se provo a usare l'ID 'req-123' per un'altra persona, deve dare errore.
+POST http://127.0.0.1/users
+Content-Type: application/json
+RequestID: req-123
+
+{
+  "email": "luigi.verdi@unict.it",
+  "password": "Password2!",
+  "nome": "Luigi",
+  "cognome": "Verdi",
+  "codice_fiscale": "VRDLGU80A01H501X",
+  "carta_credito": "8765432187654321",
+  "scadenza": "10/28",
+  "cvv": "456"
+}
+
+### 1.4 Registrazione Utente Tester Allerte
+# Creiamo un secondo utente specifico per testare gli allarmi
+POST http://127.0.0.1/users
+Content-Type: application/json
+RequestID: req-tester-999
+
+{
+  "email": "giovanni.contarino.gc@gmail.com",
+  "password": "PasswordTest!",
+  "nome": "Tester",
+  "cognome": "Allerte",
+  "codice_fiscale": "TSTLRT80A01H501X",
+  "carta_credito": "1111222233334444",
+  "scadenza": "12/28",
+  "cvv": "123"
+}
+
+### 1.5 Cancellazione Utente (Password Errata)
+# Deve dare errore 401 perché la password che ho inserito nella request è sbagliata
+DELETE http://127.0.0.1/users
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "password_sbagliata"
+}
+
+### 1.6 Elimina Utente Mario (Password Corretta)
+DELETE http://127.0.0.1/users
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "PasswordSicura!"
+}
+
+
+### 1.7 Elimina Utente Luigi
+DELETE http://127.0.0.1/users
+Content-Type: application/json
+
+{
+  "email": "luigi.verdi@unict.it",
+  "password": "PasswordSegreta!"
+}
+
+### 1.8 Elimina Tester
+DELETE http://127.0.0.1/users
+Content-Type: application/json
+
+{
+  "email": "giovanni.contarino.gc@gmail.com",
+  "password": "PasswordTest!"
+}
+
+### Scenario 2: Gestione dati e interessi (Data_Collector)
+### 2.1 Aggiungi Interesse (Utente Inesistente)
+# Deve dare 404 perché "ciao" non è un utente registrato
+POST http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "ciao@gmail.com",
+  "airport_code": "LICC"
+}
+
+
+### 2.2 Aggiungi Interesse di base (senza soglie)
+# Usiamo l'email dell'utente creato nella prima request
+POST http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "airport_code": "KJFK"
+}
+
+### 2.3 Aggiungi Interesse con Soglie 1
+#Test inserimento soglie normali, il valore di 200 non viene mai superato
+POST http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "giovanni.contarino.gc@gmail.com",
+  "airport_code": "EGLL",
+  "low_value": 10,
+  "high_value": 200
+}
+
+### 2.4 Aggiungi Interesse Soglie 2 - CASO ALLARME ALTO
+#di solito il numero di voli scaricato è circa 60/70
+#questa soglia fa sicuro scattare l'allarme
+POST http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "giovanni.contarino.gc@gmail.com",
+  "airport_code": "EGLL",
+  "low_value": 0,
+  "high_value": 10
+}
+
+### 2.5 Errore Logico Soglie
+#Test errore logico delle soglie, deve restituire 400 perché low è maggiore di high
+POST http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "giovanni.contarino.gc@gmail.com",
+  "airport_code": "EGLL",
+  "low_value": 50,
+  "high_value": 20
+}
+
+
+### 2.6 Aggiornamento soglie 1
+POST http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "airport_code": "KJFK",
+  "low_value": 10,
+  "high_value": 50
+}
+
+### 2.7 Aggionramento soglie 2
+#Usiamo la stessa email e aeroporto, ma cambiamo le soglie.
+POST http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "airport_code": "KJFK",
+  "low_value": 5,
+  "high_value": 100
+}
+
+### 2.8 Consultazione di tutti gli interessi
+#Mi torna un JSON con tutti gli interessi di tutti gli utenti
+GET http://127.0.0.1/interests
+Accept: application/json
+
+### 2.9 Consultazione Specifica (Solo Mario)
+
+GET http://127.0.0.1/interests?email=mario.rossi@unict.it
+Accept: application/json
+
+### 2.10 Cancellazione Interesse con PASSWORD SBAGLIATA
+#Prova a cancellazione KJFK per mario ma la password è sbagliata, deve tornare errore 401
+DELETE http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "PasswordSbagliata",
+  "airport_code": "KJFK"
+}
+### 2.11 Cancellazione Interesse con PASSWORD CORRETTA
+#Cancella l'interesse di Mario KJFK correttamente, deve tornare 200
+DELETE http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "mario.rossi@unict.it",
+  "password": "PasswordSicura!",
+  "airport_code": "KJFK"
+}
+
+### 2.12 Cancellazione Interesse Tester
+
+DELETE http://127.0.0.1/interests
+Content-Type: application/json
+
+{
+  "email": "giovanni.contarino.gc@gmail.com",
+  "password": "PasswordTest!",
+  "airport_code": "EGLL"
+}
+
+### 2.13 Aggiungi Interesse Test
+
+POST http://127.0.0.1/interests
+Content-Type: application/json
+#Ho usato l'ICAO di Atlanta che è il più affollato al mondo
+
+{
+  "email": "giovanni.contarino.gc@gmail.com",
+  "airport_code": "KATL",
+  "low_value": 0,
+  "high_value": 50
+}
+
+
+###Scenario 3: Recupero dei dati e statistiche sui voli
+
+### 3.1 Recupera Voli (Londra)
+#Mi torna un file json con tutti i voli in formato grezzo dell'aeroporto di Londra
+GET http://127.0.0.1/flights/EGLL
+Accept: application/json
+
+### 3.2 Recupera SOLO Partenze
+# Restituisce il JSON con tutti i voli decollati da Londra
+GET http://127.0.0.1/flights/EGLL?type=departure
+Accept: application/json
+
+### 3.3 Recupera SOLO Arrivi
+# Restituisce il JSON con tutti i voli atterrati a Londra
+GET http://127.0.0.1/flights/EGLL?type=arrival
+Accept: application/json
+
+### 3.2 Recupera Voli (Catania)
+#Non torna niente (lista vuota) perché non ho messo Catania negli interessi
+GET http://127.0.0.1/flights/LICC
+Accept: application/json
+
+### 3.3 Recupera l'ULTIMO volo in ARRIVO a Londra
+# Restituisce un solo oggetto JSON (il piu' recente).
+GET http://127.0.0.1/flights/last?code=EGLL&type=arrival
+Accept: application/json
+
+### 3.4 Recupera l'ULTIMO volo in PARTENZA da Londra
+# Uguale a sopra ma nella richiesta abbiamo specificato che è una partenza
+GET http://127.0.0.1/flights/last?code=EGLL&type=departure
+Accept: application/json
+
+### 3.5 Calcola MEDIA giornaliera dei voli in arrivo all'aeroporto di Londra
+# Restituisce il JSON con la statistica calcolata.
+GET http://127.0.0.1/statistics/average?code=EGLL&days=3&type=arrival
+Accept: application/json
+
+### 3.6 Recupera Voli (New York)
+#Mi torna un file json con tutti i voli in formato grezzo dell'aeroporto di New York
+GET http://127.0.0.1/flights/KJFK
+Accept: application/json
+

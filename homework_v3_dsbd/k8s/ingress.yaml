@@ -1,0 +1,63 @@
+#Questo file configura le regole di routing per l'Ingress Controller (NGINX).
+#Funge da "Reverse Proxy": riceve tutto il traffico HTTP dall'esterno (browser)
+#sulla porta 80 e lo smista ai vari microservizi interni in base al percorso
+
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: homework3-dsbd-ingress
+  annotations:
+
+    #Questo passo è fondamentale per disabilitare il redirect HTTP -> HTTPS che viene
+    #fatto in automatico da Nginx. Noi infatti non abbiamo usato dei certificati SSL/TLS
+    #validi, oppure self-signed perché sarebbe stato troppo complesso per questo progetto.
+    #e non ritenuto necessario in fase di progettazione.
+    #Quindi accettiamo banalmente il traffico HTTP standard e non HTTPS.
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+    - http:
+        paths:
+          #Tutto ciò che inizia con /users viene inviato al microservizio User Manager.
+          #PathType Prefix garantisce che funzionino anche le sottorisorse (es. /users/XXX.
+          - path: /users
+            pathType: Prefix
+            backend:
+              service:
+                name: user-manager
+                port:
+                  number: 5000
+          #Rotta per gli interessi del data collector
+          - path: /interests
+            pathType: Prefix
+            backend:
+              service:
+                name: data-collector
+                port:
+                  number: 5000
+          #Rotta per i voli del data collector
+          - path: /flights
+            pathType: Prefix
+            backend:
+              service:
+                name: data-collector
+                port:
+                  number: 5000
+          #Rotta per le statistiche del data collector
+          - path: /statistics
+            pathType: Prefix
+            backend:
+              service:
+                name: data-collector
+                port:
+                  number: 5000
+          #La rotta di default è stata utilizzata banalmente per Prometheus.
+          #utile per visualizzare le metriche immediatamente.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-service
+                port:
+                  number: 9090

@@ -1,0 +1,10 @@
+flask
+grpcio
+grpcio-tools
+protobuf
+pymongo
+requests
+apscheduler
+confluent-kafka
+pybreaker
+prometheus_client

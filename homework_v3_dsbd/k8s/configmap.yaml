@@ -1,0 +1,42 @@
+#ConfigMap viene utilizzato per memorizziare le variabili di configurazione
+#come nomi dei database, porte, ecc. Il tutto disaccopiando il codice dell'applicazione
+#dal deployment. In modo da poter cambiare facilmente le impostazioni senza dover aggiornare il codice.
+#In poche parole, serve a configurare l'ambiente a runtime.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homework3-dsbd-config
+data:
+  #Configurazione database utenti PostgreSQL
+  #utilizziamo il nome del servizio di K8s invece dell'IP per sfruttare il DNS
+  #interno di Kubernetes (cioè sfruttiamo il Service Discovery interno di K8s, che
+  #permette di risolvere automaticamente il nome del servizio in un IP interno)
+  PG_HOST: "postgres-service"
+  PG_PORT: "5432"
+  PG_NAME: "user_db"
+  PG_USER: "postgres"
+  #La password del database NON è presente qui. Ma è presente nel file secrets.yaml
+  #questo viene fatto per evitare di mettere la password in chiaro.
+
+  #Per Mongo, costruiamo l'URI parziale che viene usato da PyMongo.
+  #"mongo-service" è il nome del servizio di K8s per Mongo definito in databases.yaml
+  MONGO_URI: "mongodb://mongo-service:27017/flight_data"
+  MONGO_HOST: "mongo-service"
+  MONGO_PORT: "27017"
+
+  #Indirizzo del broker Kafka a cui i microservizi inviano/leggono messaggi.
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+
+
+  # Porte su cui i server Flask rimangono in ascolto all'interno dei Pod
+  FLASK_USER_PORT: "5000"
+  FLASK_DATA_PORT: "5000"
+
+  #Indirizzo gRPC per la comunicazione Data Collector -> User Manager
+  #es. verifica esistenza utente prima di aggiungere un interesse
+  GRPC_SERVER_ADDRESS: "user-manager:50051"
+
+  #URL HTTP per la comunicazione User Manager -> Data Collector
+  #es. richiesta di cleanup interessi dopo cancellazione utente
+  DATA_COLLECTOR_URL: "http://data-collector:5000"

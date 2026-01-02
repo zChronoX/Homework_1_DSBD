@@ -1,0 +1,241 @@
+#In questo file definiamo le Deployment per ogni microservizio, cioè i componenti logici
+#dell'applicazione. Tra gli elementi chiave, troviamo l'utilizzo di deployment invece che StatefulSet
+#che in questo caso è corretto da usare perché tali servizi non salvano dati su un disco locale
+#Nel caso in cui un pod dovesse crashare, questo viene sostituito da una copia pulita
+#senza perdere informazioni (che nel nostro caso stanno su DB).
+#Anche qui i parametri non sono hardcoded, cioè scritti nel codice, ma vengono prelevati dalle
+#configurazioni esterne (ConfigMap e Secret).
+
+#User Manager
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-manager
+  template:
+    metadata:
+      labels:
+        app: user-manager
+    spec:
+      containers:
+        - name: user-manager
+          image: user-manager:v3.0
+          #Indica a Kubernetes di usare l'immagine locale che abbiamo caricato con 'kind load'.
+          #Se non ci fosse, K8s proverebbe a scaricarla da internet (Docker Hub) fallendo.
+          imagePullPolicy: Never
+          ports:
+            #porta interna del container
+            - containerPort: 5000
+          #Carichiamo massivamente tutte le variabili d'ambiente definite nei file esterni grazie ad
+          #envFrom
+          envFrom:
+            - configMapRef:
+                name: homework3-dsbd-config
+            - secretRef:
+                name: homework3-dsbd-secrets
+          #Qui abbiamo definito una serie di fix specifici per Python.
+          env:
+            #Disabilitiamo il buffering dell'output di Python.
+            #Senza questo, i log apparirebbero in ritardo, rendendo difficile il debug.
+            #In questo modo i log vengono aggiornati in tempo reale.
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+            #Aggiunge la cartella '/app/shared' al path di Python.
+            #È necessario perché abbiamo strutturato il codice con una libreria condivisa.
+
+            - name: PYTHONPATH
+              value: "/app:/app/shared"
+
+            #Questo è per le metriche con Prometheus
+            #Passiamo il nome del nodo fisico su cui gira il pod.
+            #Serve per etichettare le metriche e capire se un nodo specifico ha problemi.
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-manager #Questo nome diventa l'host DNS interno
+spec:
+  selector:
+    app: user-manager
+  #Espone porte multiple per protocolli diversi (metriche, API, gRPC)
+  ports:
+    - name: api
+      protocol: TCP
+      port: 5000
+      targetPort: 5000
+
+    - name: metrics
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+
+    - name: grpc
+      protocol: TCP
+      port: 50051
+      targetPort: 50051
+---
+
+#Data Collector
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-collector
+  template:
+    metadata:
+      labels:
+        app: data-collector
+    spec:
+      containers:
+        - name: data-collector
+          image: data-collector:v3.5 #Abbiamo aggiornato diverse volte l'immagine per via di diversi fix fatti in Python
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5000
+          # Riutilizzo della stessa ConfigMap e Secrets
+          envFrom:
+            - configMapRef:
+                name: homework3-dsbd-config
+            - secretRef:
+                name: homework3-dsbd-secrets
+          #Stessi fix di Python di prima
+          env:
+
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+            - name: PYTHONPATH
+              value: "/app:/app/shared"
+
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-collector
+spec:
+  selector:
+    app: data-collector
+  ports:
+  - name: api
+    protocol: TCP
+    port: 5000
+    targetPort: 5000
+
+  - name: metrics
+    protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+
+#Alert System
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-system
+  template:
+    metadata:
+      labels:
+        app: alert-system
+    spec:
+      containers:
+        - name: alert-system
+          image: alert-system:v3.1
+          imagePullPolicy: Never
+
+          #Qui non serve esporre porte nel container perché questo servizio
+          #non riceve connessioni in ingresso. È lui che si connette direttamente a Kafka.
+          envFrom:
+            - configMapRef:
+                name: homework3-dsbd-config
+            - secretRef:
+                name: homework3-dsbd-secrets
+          env:
+
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+            - name: PYTHONPATH
+              value: "/app:/app/shared"
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+---
+#Nota: Non abbiamo definito alcun oggetto "Service" per l'Alert System.
+#Poiché agisce solo come Consumer Kafka, nessuno deve contattarlo direttamente via rete.
+
+
+#Notifier
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notifier
+  template:
+    metadata:
+      labels:
+        app: notifier
+    spec:
+      containers:
+        - name: notifier
+          image: notifier:v3.1
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: homework3-dsbd-config
+            - secretRef:
+                name: homework3-dsbd-secrets
+          env:
+
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+            - name: PYTHONPATH
+              value: "/app:/app/shared"
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+---
+
+#Nel caso del Notifier, lo abbiamo definito come Service solo perchè Prometheus
+#lo contatta per leggere le metriche
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifier
+spec:
+  selector:
+    app: notifier
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000

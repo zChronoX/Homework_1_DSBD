@@ -1,0 +1,49 @@
+#Questo file definisce come deve essere creato il cluster di Kind
+#su cui girerà Kubernetes.
+#Lo scopo del file è di abilitare l'Ingress Controller per poter accedere ai servizi da localhost.
+#Di default, Kind chiude il cluster in una scatola isolata. Qui apriamo le porte.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  #Nodo master
+  - role: control-plane
+    #Serve a etichettare il nodo per far partire l'Ingress NGINX.
+    #senza questo parametro Nginx non funzionerebbe.
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    #Port mapping per accedere al sito da Windows (Porta 80)
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+
+
+#Aggiungiamo due nodi worker in modo tale da non appesantire troppo il nodo master.
+#Inoltre lasciamo scegliere allo scheduler in modo automatico quale
+#microservizio eseguire su ogni nodo. In quanto per il nostro progetto non è
+#richiesto assegnare regole di schedulazione specifiche per ogni microservizio.
+
+  - role: worker
+
+  - role: worker
+
+
+
+#Configurazione di rete Kubernetes in-cluster
+#Diciamo in modo esplicito a Kind che deve esporre le API di controllo su localhost.
+#in modo tale che nessuno dall'esterno puà mandare comandi kubectl al cluster.
+#Fissa l'indirizzo e la porta delle API di Kubernetes su localhost:6443.
+#Questo rende l'URL del cluster deterministico.+
+#E' molto simile ai "networks" utilizzati in Docker.
+networking:
+  apiServerAddress: "127.0.0.1"
+  #Specifichiamo pure una porta in modo tale che non venga scelta a caso ogni
+  #volta che si avvia il cluster.
+  apiServerPort: 6443

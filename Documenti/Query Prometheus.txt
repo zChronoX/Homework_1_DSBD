@@ -1,0 +1,31 @@
+data_collector_fetch_created
+
+data_collector_fetch_total X
+
+data_collector_last_flights X
+
+data_collector_total_interests X
+
+user_manager_deletition_total X
+
+user_manager_registration_created
+
+user_manager_registration_total X
+
+user_manager_total_users X
+
+notifier_email_sent_created
+
+notifier_email_sent_total X
+
+process_resident_memory_bytes X
+
+process_cpu_seconds_total X
+
+process_start_time_seconds X
+
+up X
+
+scrape_duration_seconds X
+ 
+scrape_samples_scraped X
