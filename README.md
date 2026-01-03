@@ -5,6 +5,9 @@
 ![Docker](https://img.shields.io/badge/Docker-Container-2496ed?style=for-the-badge&logo=docker)
 ![Kafka](https://img.shields.io/badge/Apache_Kafka-KRaft-231f20?style=for-the-badge&logo=apache-kafka)
 ![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-e6522c?style=for-the-badge&logo=prometheus)
+![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)
+![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white)
 
 ## Descrizione del Progetto
 
@@ -41,8 +44,12 @@ Il sistema è progettato seguendo il pattern **Microservices Architecture**. La 
 4.  **Notifier Service**
     * Gestisce l'invio fisico delle email tramite server **SMTP Gmail (SSL)**.
     * Disaccoppia la latenza dell'invio email dal flusso di analisi dati.
+  
+5.  **Redis (Caching & Locking)**
+    * Database In-Memory chiave-valore (StatefulSet).
+    * Garantisce che una richiesta (RequestID) venga processata una sola volta, indipendentemente da quale replica del servizio la riceva.
 
-5.  **Prometheus (Monitoring)**
+6.  **Prometheus (Monitoring)**
     * Componente infrastrutturale per l'osservabilità.
     * Esegue lo scraping delle metriche esposte dagli altri servizi (registrazioni, numero voli, errori, risorse CPU/RAM).
 
@@ -56,10 +63,18 @@ Il sistema è progettato seguendo il pattern **Microservices Architecture**. La 
 * **Networking:** NGINX Ingress Controller.
 * **Message Broker:** Apache Kafka (Modalità **KRaft** senza Zookeeper).
 
+### Topologia Cluster 
+Il cluster è configurato con **4 Nodi** per garantire la stabilità:
+*  **Control Plane:** Gestione API Server e Ingress.
+*  **Monitoring Node:** Nodo dedicato esclusivamente a Prometheus (via `nodeSelector`).
+*  **Worker Node 1:** Nodo dedicato esclusivamente all'esecuzione del Data Collector.
+*  **Worker Node 2:** Pool generico per l'esecuzione dei microservizi applicativi e database.
+
 ### Design Patterns
 * **Persistence:** Uso combinato di SQL (Postgres) per dati strutturati e NoSQL (MongoDB) per dati volumetrici.
+* **Resource Quotas:** Ogni pod ha limiti `requests` e `limits` di CPU/RAM per evitare il crash del nodo.
 * **Circuit Breaker:** Protezione contro i guasti a cascata verso servizi esterni.
-* **Event-Driven Architecture:** Pipeline asincrona per massimizzare il throughput.
+
 
 
 ---
@@ -128,6 +143,9 @@ kubectl port-forward service/postgres-service 5432:5432
 
 # Terminale 2: MongoDB (Porta locale 27017)
 kubectl port-forward service/mongo-service 27017:27017
+
+# Terminale 3: Redis (Porta locale 6379)
+kubectl port-forward service/redis-service 6379:6379
 ```
 ##  Credenziali di Accesso 
 
@@ -137,6 +155,7 @@ I database (`postgres`, `mongo`) risiedono nella rete privata del cluster. Per a
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **PostgreSQL** | `localhost` | `5432` | `postgres` | `postgrespassword` | `user_db` |
 | **MongoDB** | `localhost` | `27017` | `admin` | `adminpassword` | `admin` |
+| **MongoDB** | `localhost` | `6379` | `vuoto` | `vuoto` | `0` |
 
 ---
 
