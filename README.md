@@ -15,7 +15,7 @@
 
 Il sistema permette agli utenti di registrare "interessi" su specifici aeroporti (es. Fiumicino, Heathrow) definendo soglie personalizzate (numero di voli). Grazie all'integrazione con le API di **OpenSky Network**, il sistema raccoglie dati periodicamente e, sfruttando un'architettura **Event-Driven**, analizza i flussi e invia notifiche via email qualora le soglie vengano superate.
 
-Questa versione (**v3.0**) rappresenta l'evoluzione finale del progetto: l'intera infrastruttura è stata migrata da Docker Compose a un cluster **Kubernetes** (Kind), introducendo pattern di **Self-Healing**, **High Availability** e **White-Box Monitoring**.
+Questa versione rappresenta l'evoluzione finale del progetto: l'intera infrastruttura è stata migrata da Docker Compose a un cluster **Kubernetes** (Kind), introducendo pattern di **Self-Healing**, **High Availability** e **White-Box Monitoring**.
 
 ---
 
