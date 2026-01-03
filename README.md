@@ -34,7 +34,7 @@ Il sistema è progettato seguendo il pattern **Microservices Architecture**. La 
     * Cuore dell'ingestion dati. Interroga ciclicamente le API OpenSky (OAuth2).
     * Protetto dal pattern **Circuit Breaker** per gestire i fallimenti delle API esterne.
     * Agisce come **Kafka Producer** pubblicando i voli grezzi.
-    * **DB:** MongoDB (Time-Series / NoSQL).
+    * **DB:** MongoDB (NoSQL).
 
 3.  **Alert System**
     * Motore di analisi in tempo reale (Stream Processing).
