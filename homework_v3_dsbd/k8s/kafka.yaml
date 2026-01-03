@@ -18,6 +18,16 @@ spec:
         - name: kafka
           # Immagine ufficiale Confluent che utilizza Kafka in modalità KRaft
           image: confluentinc/cp-kafka:7.4.0
+          # RISORSE (Specifiche per Java/Kafka) ---
+          # Kafka è un'applicazione Java, che tende a consumare molta RAM.
+          # Impostiamo limiti più generosi rispetto ai microservizi Python.
+          resources:
+            requests:
+              memory: "512Mi" # Minimo mezzo giga per far partire la JVM
+              cpu: "250m"
+            limits:
+              memory: "1Gi"   # Tetto massimo a 1GB per evitare OOM del nodo
+              cpu: "1000m"    # Può usare fino a 1 core intero se serve
           ports:
             - containerPort: 9092 # Porta standard per il traffico client
           #Questo script serve per inizializzare KRaft.

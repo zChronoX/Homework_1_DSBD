@@ -8,6 +8,7 @@ docker start kind-control-plane
 # Riavvia i nodi worker
 docker start kind-worker
 docker start kind-worker2
+docker start kind-worker3
 
 echo "Attesa che i nodi siano pronti (10 secondi)"
 sleep 10

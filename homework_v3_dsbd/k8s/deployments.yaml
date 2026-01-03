@@ -27,6 +27,21 @@ spec:
           #Indica a Kubernetes di usare l'immagine locale che abbiamo caricato con 'kind load'.
           #Se non ci fosse, K8s proverebbe a scaricarla da internet (Docker Hub) fallendo.
           imagePullPolicy: Never
+          # GESTIONE RISORSE
+          # Definiamo quanta CPU e RAM deve avere il container. Questo è fondamentale in produzione
+          # per evitare che un pod "cannibalizzi" le risorse del nodo a scapito degli altri (Noisy Neighbor).
+          resources:
+            requests:
+              # Quantità MINIMA garantita. Kubernetes schedulerà il pod solo su un nodo che ha
+              # almeno questi valori liberi.
+              memory: "128Mi"
+              cpu: "100m"     # 100 millicores = 0.1 CPU
+            limits:
+              # Quantità MASSIMA consentita.
+              # Se il container supera la memoria limite, verrà terminato (OOMKilled) e riavviato.
+              # Se cerca di usare più CPU, verrà rallentato (Throttling).
+              memory: "512Mi" # Python/Flask possono essere pesanti, diamo un po' di margine
+              cpu: "500m"     # Max mezza CPU
           ports:
             #porta interna del container
             - containerPort: 5000
@@ -100,10 +115,21 @@ spec:
       labels:
         app: data-collector
     spec:
+
+      nodeSelector:
+        tier: backend
+
       containers:
         - name: data-collector
           image: data-collector:v3.5 #Abbiamo aggiornato diverse volte l'immagine per via di diversi fix fatti in Python
           imagePullPolicy: Never
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           ports:
             - containerPort: 5000
           # Riutilizzo della stessa ConfigMap e Secrets
@@ -165,6 +191,13 @@ spec:
         - name: alert-system
           image: alert-system:v3.1
           imagePullPolicy: Never
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 
           #Qui non serve esporre porte nel container perché questo servizio
           #non riceve connessioni in ingresso. È lui che si connette direttamente a Kafka.
@@ -208,6 +241,13 @@ spec:
         - name: notifier
           image: notifier:v3.1
           imagePullPolicy: Never
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           envFrom:
             - configMapRef:
                 name: homework3-dsbd-config

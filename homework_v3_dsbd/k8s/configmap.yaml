@@ -40,3 +40,7 @@ data:
   #URL HTTP per la comunicazione User Manager -> Data Collector
   #es. richiesta di cleanup interessi dopo cancellazione utente
   DATA_COLLECTOR_URL: "http://data-collector:5000"
+
+
+  REDIS_HOST: "redis-service"  # Il nome del Service che abbiamo creato sopra
+  REDIS_PORT: "6379"

@@ -39,7 +39,7 @@ class UserManagerServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def VerifyUserCredentials(self, request, context):
-        """[NUOVO] Metodo che verifica se le credenziali (email + password) sono valide
+        """Metodo che verifica se le credenziali (email + password) sono valide
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

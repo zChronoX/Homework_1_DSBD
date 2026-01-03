@@ -25,12 +25,17 @@ nodes:
         protocol: TCP
 
 
-#Aggiungiamo due nodi worker in modo tale da non appesantire troppo il nodo master.
-#Inoltre lasciamo scegliere allo scheduler in modo automatico quale
-#microservizio eseguire su ogni nodo. In quanto per il nostro progetto non è
-#richiesto assegnare regole di schedulazione specifiche per ogni microservizio.
+#Aggiungiamo 3 nodi worker in modo tale da non appesantire troppo il nodo master.
+#Facciamo in modo che un nodo si dedichi unicamente a Prometheus, mentre un altro
+#unicamente al Data Collector, etichettato come "backend".
 
   - role: worker
+    labels:
+      tier: "monitoring"
+
+  - role: worker
+    labels:
+      tier: "backend"
 
   - role: worker
 

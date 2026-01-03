@@ -41,7 +41,7 @@ RequestID: req-123
 # Se provo a usare l'ID 'req-123' per un'altra persona, deve dare errore.
 POST http://127.0.0.1/users
 Content-Type: application/json
-RequestID: req-123
+RequestID: req-1231
 
 {
   "email": "luigi.verdi@unict.it",
@@ -97,7 +97,7 @@ Content-Type: application/json
 
 {
   "email": "luigi.verdi@unict.it",
-  "password": "PasswordSegreta!"
+  "password": "Password2!"
 }
 
 ### 1.8 Elimina Tester

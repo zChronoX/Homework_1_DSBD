@@ -5,3 +5,4 @@ protobuf
 psycopg2-binary #Meglio di sqlAlchemy
 requests
 prometheus_client
+redis==5.0.1
